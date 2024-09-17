@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv('config.env')
-STOCK = "GOOG"
-COMPANY_NAME = "Google"
+STOCK = "NVDA"
+COMPANY_NAME = "Nvidia"
 api_key_1 = os.getenv('API_KEY_1')  # Alpha Vantage
 api_key_2 = os.getenv('API_KEY_2')  # News Api
 my_email = os.getenv('MY_EMAIL')
@@ -21,45 +21,39 @@ def price_fluctuation(new_price, old_price):
 
 alphavantage_url = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={STOCK}&apikey=api_key_1'
 alphavantage_r = requests.get(alphavantage_url)
-alphavantage_data = alphavantage_r.json()
-current_date = datetime.now()
-new_date = current_date - timedelta(days=1)
-old_date = current_date - timedelta(days=2)
+alphavantage_data = alphavantage_r.json()["Time Series (Daily)"]
+alphavantage_data_list = [value for (key, value) in alphavantage_data.items()]
+yesterday_data = alphavantage_data_list[0]
+yesterday_closing_price = float(yesterday_data["4. close"])
 
-formatted_new_date = new_date.strftime("%Y-%m-%d")
-formatted_old_date = old_date.strftime("%Y-%m-%d")
+day_before_yesterday_data = alphavantage_data_list[1]
+day_before_yesterday_closing_price = float(day_before_yesterday_data["4. close"])
 
-new_price = float(alphavantage_data["Time Series (Daily)"][formatted_new_date]["4. close"])
-old_price = float(alphavantage_data["Time Series (Daily)"][formatted_old_date]["4. close"])
-
-news_date = current_date - timedelta(days=3)
-formatted_news_date = news_date.strftime("%Y-%m-%d")
-newsapi_url = f'https://newsapi.org/v2/everything?q={STOCK}&from={formatted_news_date}&apiKey=api_key_2'
+newsapi_url = f'https://newsapi.org/v2/everything?qInTitle={COMPANY_NAME}&apiKey=api_key_2'
 newsapi_r = requests.get(newsapi_url)
-newsapi_data = newsapi_r.json()
+newsapi_articles = newsapi_r.json()["articles"]
 
-print(newsapi_data)
-print(api_key_1, api_key_2)
-# news_1 = newsapi_data["articles"][0]["title"]
-# news_2 = newsapi_data["articles"][1]["title"]
-# news_3 = newsapi_data["articles"][2]["title"]
-#
-# price_change = price_fluctuation(new_price, old_price)
-# if price_change > 1 or price_change < -1:
-#     email_content = f"""
-#                 {COMPANY_NAME}: STOCK {old_price} -> {new_price}: {round(price_change, 2)}%
-#                 News:
-#                 {news_1}.
-#                 {news_2}.
-#                 {news_3}.
-#             """
-#
-#     msg = MIMEText(email_content, 'plain', 'utf-8')
-#     msg['Subject'] = 'Stock News!'
-#     msg['From'] = my_email
-#     msg['To'] = my_email
-#
-#     with smtplib.SMTP("smtp.gmail.com", port=587) as connection:
-#         connection.starttls()
-#         connection.login(user=my_email, password=my_password)
-#         connection.sendmail(from_addr=my_email, to_addrs=my_email, msg=msg.as_string())
+three_articles = newsapi_articles[:3]
+formatted_articles = [
+    f"{article['title']}" for article in three_articles]
+
+price_change = price_fluctuation(yesterday_closing_price, day_before_yesterday_closing_price)
+if abs(price_change) > 1:
+    email_content = f"""
+        {COMPANY_NAME}: STOCK {day_before_yesterday_closing_price} -> {yesterday_closing_price}: {round(price_change, 2)}%
+        News:
+        {formatted_articles[0]}.
+        {formatted_articles[1]}.
+        {formatted_articles[2]}.
+        """
+
+    msg = MIMEText(email_content, 'plain', 'utf-8')
+    msg['Subject'] = 'Stock News!'
+    msg['From'] = my_email
+    msg['To'] = my_email
+
+    print(email_content)
+    with smtplib.SMTP("smtp.gmail.com", port=587) as connection:
+        connection.starttls()
+        connection.login(user=my_email, password=my_password)
+        connection.sendmail(from_addr=my_email, to_addrs=my_email, msg=msg.as_string())
